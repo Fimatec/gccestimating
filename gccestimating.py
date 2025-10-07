@@ -3,7 +3,6 @@
 Istanciation Signatures:
 
 - `gcc = GCC(sig1, sig2, fftlen)`
-- `gcc = GCC.from_spectra(spec1, spec2, onesided=True)`
 
 Estimators:
 
@@ -14,7 +13,7 @@ Estimators:
 """
 from dataclasses import dataclass as _dataclass
 import numpy as _np
-
+import scipy as _sc
 
 
 class GCC(object):
@@ -86,86 +85,7 @@ class GCC(object):
 
     """
 
-    @classmethod
-    def from_spectra(cls, spec1, spec2, onesided=True):
-        """Returns a GCC instance.
-
-        Parameters
-        ----------
-        spec1 : ndarray
-            First spectrum.
-        spec2 : ndarray 
-            Second spectrum.
-        onesided : bool
-            If you provide twosided Spectra 
-            (e.g. of comples signals) set to False.
-            Default is True.
-
-        Returns
-        -------
-        gcc : GCC
-
-        """
-        instance = cls()
-        length1 = len(spec1)
-        
-        if len(spec2) != length1:
-            raise ValueError('Spectra must be of same dimension.')
-        
-        instance._spec1 = spec1
-        instance._spec2 = spec2
-
-        if onesided:
-            instance._fftlen = 2*length1-2 if length1%2 else 2*length1-1 
-            instance._fft = _np.fft.rfft
-            instance._ifft = _np.fft.irfft 
-        else:
-            instance._fftlen = length1
-            instance._fft = _np.fft.fft
-            instance._ifft = _np.fft.ifft 
-        instance._corrlen = instance._fftlen - 1
-        return instance
-
-    def __init__(self, sig1=None, sig2=None, fftlen=None):
-        """Returns a GCC instance.
-
-        Parameters
-        ----------
-        sig1 : ndarray (N,)
-            First signal.
-        sig2 : ndarray (M,)
-            Second signal.
-        fftlen : int or None
-            Length of fft to be computed. 
-            Will be calculated automatically if None 
-            (next power of two of 2max(N,M)-1).
-
-        Returns
-        -------
-        gcc : GCC
-
-        """
-        self._sig1 = None
-        self._sig2 = None
-        self._spec11 = None
-        self._spec22 = None
-        self._spec12 = None
-        self._gamma12 = None
-
-        self._cc = None
-        self._roth = None
-        self._scot = None
-        self._phat = None
-        self._eckart = None
-        self._ht = None
-
-        self._corrlen = None
-        self._fftlen = fftlen
-
-        if sig1 is not None:
-            self._from_signals(sig1, sig2, fftlen)
-
-    def _from_signals(self, sig1, sig2, fftlen=None):
+    def __init__(self, sig1, sig2, fftlen=None, window='boxcar'):
         corrlen = len(sig1) + len(sig2) - 1
         fftlen = fftlen or int(2**_np.ceil(_np.log2(corrlen)))
         fft, ifft = _get_fftfuncs(sig1, sig2)
@@ -179,9 +99,21 @@ class GCC(object):
         self._sig2 = sig2   
         self._spec1 = spec1
         self._spec2 = spec2   
+        self._spec11 = None
+        self._spec22 = None
+        self._spec12 = None
+        self._gamma12 = None
+        self._cc = None
+        self._roth = None
+        self._scot = None
+        self._phat = None
+        self._eckart = None
+        self._ht = None
+        self._window = window
 
     def _backtransform(self, spec):
-        sig = self._ifft(spec, self._fftlen)
+        window = _sc.signal.get_window(self._window, len(spec))
+        sig = self._ifft(window * spec, self._fftlen)
         sig = _np.roll(sig, len(sig)//2)
         start = (len(sig)-self._corrlen)//2 + 1
         return sig[start:start+self._corrlen]
@@ -206,7 +138,6 @@ class GCC(object):
         if self._spec12 is None:
             self._spec12 = self._spec1*_np.conj(self._spec2)
         return self._spec12
-
 
     @_dataclass(init=True, repr=True, eq=True)
     class Estimate():
@@ -385,9 +316,9 @@ def corrlags(corrlen, samplerate=1):
 def _get_fftfuncs(*signals):
     """Returns fft, ifft function depending on given signals data type."""
     if _np.all([_np.all(_np.isreal(sig)) for sig in signals]):
-        return _np.fft.rfft, _np.fft.irfft
+        return _sc.fft.rfft, _sc.fft.irfft
     else:
-        return _np.fft.fft, _np.fft.ifft
+        return _sc.fft.fft, _sc.fft.ifft
 
 
 def _prevent_zerodivision(sig, reg=1e-12, rep=1e-12):

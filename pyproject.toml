@@ -7,9 +7,9 @@ name = "gccestimating"
 version = "0.2.1"
 description = "Generalized Cross Correlation estimation based on numpy."
 authors = [{ name = "Siegfried Gündert", email = "siegfried.guendert@googlemail.com" }]
-requires-python = ">3.8,<4.0"
+requires-python = ">3.9,<4.0"
 license = "MPL-2.0"
-dependencies = ["numpy>=1.22"]
+dependencies = ["numpy>=1.22", "scipy>=1.13"]
 
 [dependency-groups]
 dev = [
