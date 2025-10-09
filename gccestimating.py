@@ -70,12 +70,17 @@ class GCC(object):
         self._sig2 = sig2   
         self._spec1 = spec1
         self._spec2 = spec2   
-        self._spec11 = self._beta * self._spec11 + \
-            (1 - self._beta) * _np.real(self._spec1 * _np.conj(self._spec1))
-        self._spec22 = self._beta * self._spec22 + \
-            (1 - self._beta) * _np.real(self._spec2 * _np.conj(self._spec2))
-        self._spec12 = self._beta * self._spec12 + \
-            (1 - self._beta) * (self._spec1 * _np.conj(self._spec2))
+        if self._spec11 is None:
+            self._spec11 = _np.real(self._spec1 * _np.conj(self._spec1))
+            self._spec22 = _np.real(self._spec2 * _np.conj(self._spec2))
+            self._spec12 = self._spec1 * _np.conj(self._spec2)
+        else:
+            self._spec11 = self._beta * self._spec11 + \
+                (1 - self._beta) * _np.real(self._spec1 * _np.conj(self._spec1))
+            self._spec22 = self._beta * self._spec22 + \
+                (1 - self._beta) * _np.real(self._spec2 * _np.conj(self._spec2))
+            self._spec12 = self._beta * self._spec12 + \
+                (1 - self._beta) * (self._spec1 * _np.conj(self._spec2))
         self._fft = fft  
         self._ifft = ifft
         self._gamma12 = None
@@ -276,10 +281,8 @@ def _get_fftfuncs(*signals):
         return _sc.fft.fft, _sc.fft.ifft
 
 
-def _prevent_zerodivision(sig, eps=1e-12):
-    """
-    Replaces values smaller than reg. Same for negative values
-    and negative reg.
+def _prevent_zerodivision(sig, reg=1e-12, rep=1e-12):
+    """Replaces values smaler reg. Same for negative values and negative reg.
     
     Replaces 
     
@@ -305,4 +308,8 @@ def _prevent_zerodivision(sig, eps=1e-12):
         Modified sig usable for division.
 
     """
-    return sig + eps
+    reg = abs(reg)
+    rep = abs(rep)
+    sig[_np.logical_and(sig < reg, sig >= 0)] = rep
+    sig[_np.logical_and(sig > -reg, sig <= 0)] = -rep
+    return sig
