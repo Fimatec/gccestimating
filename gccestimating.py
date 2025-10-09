@@ -17,91 +17,43 @@ import scipy as _sc
 
 
 class GCC(object):
-    """Returns a GCC instance.
+    """
+    Returns a GCC instance to listen two radios.
 
     Provides estimation methods for Generalized Cross Correlation.
 
     Parameters
     ----------
-    sig1 : ndarray
-        First signal.
-    sig2 : ndarray 
-        Second signal.
+    sig_len: int
+        Length of the both input signals
     fftlen : int or None
         Length of fft to be computed. 
         If None, it will be calculated automatically as next power of two.
+    beta : float (default=0.9)
+        EMA Smoothing factor for spectra
 
     Returns
     -------
     gcc : GCC
 
-    Examples
-    --------
-    >>> import numpy as np
-    >>> import matplotlib.pylab as plt
-    >>> from gccestimating import GCC, corrlags
-
-    >>> # generate some noise signals
-    >>> nsamp = 1024
-    
-    >>> noise1 =  0.5*np.random.randn(nsamp)
-    >>> sig1 = np.zeros(nsamp) + noise1
-    
-    >>> noise2 =  0.5*np.random.randn(nsamp)
-    >>> sig2 = np.zeros_like(sig1) + noise2
-    
-    >>> noise_both = np.random.randn(256)
-    
-    >>> sig1[:256] = noise_both
-    >>> sig2[500:756] = noise_both
-    
-    >>> # create a lags array
-    >>> lags = corrlags(2*nsamp-1, samplerate=1)
-    
-    >>> # Create the a GCC instance    
-    >>> gcc = GCC(sig1, sig2)
-    
-    >>> def mkplot(est, p):
-    >>>     plt.subplot(p)
-    >>>     plt.plot(lags, est.sig, label=est.name)
-    >>>     plt.legend()
-    
-    >>> # calculate the standard cc estimate
-    >>> cc_est = gcc.cc()
-    
-    >>> # plot it using the mkplot function
-    >>> mkplot(cc_est, 611)
-    
-    >>> # plot the other estimates
-    >>> mkplot(gcc.scot(), 612)
-    >>> mkplot(gcc.phat(), 613)
-    >>> mkplot(gcc.roth(), 614)
-    >>> mkplot(gcc.ht(), 615)
-    >>> mkplot(gcc.eckart(noise_both, noise1, noise2), 616)
-    >>> plt.figure()
-    >>> plt.plot(np.correlate(sig1, sig2, 'full'))
-    >>> plt.plot(gcc.cc())
-    >>> plt.show()
-
     """
 
-    def __init__(self, sig1, sig2, fftlen=None, window='boxcar'):
-        corrlen = len(sig1) + len(sig2) - 1
+    def __init__(self, sig_len, fftlen=None, window='boxcar', beta=0.9):
+        corrlen = 2 * sig_len - 1
         fftlen = fftlen or int(2**_np.ceil(_np.log2(corrlen)))
-        fft, ifft = _get_fftfuncs(sig1, sig2)
-        spec1 = fft(sig1, fftlen)
-        spec2 = fft(sig2, fftlen)
         self._corrlen = corrlen
         self._fftlen = fftlen
-        self._fft = fft  
-        self._ifft = ifft
-        self._sig1 = sig1
-        self._sig2 = sig2   
-        self._spec1 = spec1
-        self._spec2 = spec2   
-        self._spec11 = None
-        self._spec22 = None
-        self._spec12 = None
+        self._window = window
+        self._beta = beta
+        self._spec1 = None
+        self._spec2 = None   
+        self._sig1 = None
+        self._sig2 = None   
+        self._fft = None  
+        self._ifft = None
+        self._spec11 = 0
+        self._spec22 = 0
+        self._spec12 = 0
         self._gamma12 = None
         self._cc = None
         self._roth = None
@@ -109,7 +61,31 @@ class GCC(object):
         self._phat = None
         self._eckart = None
         self._ht = None
-        self._window = window
+
+    def fit(self, sig1, sig2) -> 'GCC':
+        fft, ifft = _get_fftfuncs(sig1, sig2)
+        spec1 = fft(sig1, self._fftlen)
+        spec2 = fft(sig2, self._fftlen)
+        self._sig1 = sig1
+        self._sig2 = sig2   
+        self._spec1 = spec1
+        self._spec2 = spec2   
+        self._spec11 = self._beta * self._spec11 + \
+            (1 - self._beta) * _np.real(self._spec1 * _np.conj(self._spec1))
+        self._spec22 = self._beta * self._spec22 + \
+            (1 - self._beta) * _np.real(self._spec2 * _np.conj(self._spec2))
+        self._spec12 = self._beta * self._spec12 + \
+            (1 - self._beta) * (self._spec1 * _np.conj(self._spec2))
+        self._fft = fft  
+        self._ifft = ifft
+        self._gamma12 = None
+        self._cc = None
+        self._roth = None
+        self._scot = None
+        self._phat = None
+        self._eckart = None
+        self._ht = None
+        return self
 
     def _backtransform(self, spec):
         window = _sc.signal.get_window(self._window, len(spec))
@@ -117,27 +93,6 @@ class GCC(object):
         sig = _np.roll(sig, len(sig)//2)
         start = (len(sig)-self._corrlen)//2 + 1
         return sig[start:start+self._corrlen]
-
-    @property
-    def spec11(self):
-        """Returns auto power spectrum of first signal."""
-        if self._spec11 is None:
-            self._spec11 = _np.real(self._spec1 * _np.conj(self._spec1))
-        return self._spec11
-
-    @property
-    def spec22(self):
-        """Returns auto power spectrum of second signal."""
-        if self._spec22 is None:
-            self._spec22 = _np.real(self._spec2 * _np.conj(self._spec2))
-        return self._spec22
-
-    @property
-    def spec12(self):
-        """Returns cross power spectrum of first and second signal."""
-        if self._spec12 is None:
-            self._spec12 = self._spec1*_np.conj(self._spec2)
-        return self._spec12
 
     @_dataclass(init=True, repr=True, eq=True)
     class Estimate():
@@ -182,8 +137,8 @@ class GCC(object):
         if self._cc is None:
             self._cc = GCC.Estimate(
                 name='CC', 
-                sig=self._backtransform(self.spec12), 
-                spec=self.spec12)
+                sig=self._backtransform(self._spec12), 
+                spec=self._spec12)
 
         return self._cc
 
@@ -194,7 +149,7 @@ class GCC(object):
 
         """
         if self._roth is None:
-            spec = self.spec12 / _prevent_zerodivision(self.spec11)
+            spec = self._spec12 / _prevent_zerodivision(self._spec11)
             self._roth = GCC.Estimate(
                 name='Roth', 
                 sig=self._backtransform(spec), 
@@ -220,8 +175,8 @@ class GCC(object):
     def gamma12(self):
         """Returns gamma12 $\\gamma_{12}(f)$"""
         if self._gamma12 is None:
-            self._gamma12 = self.spec12 / _prevent_zerodivision(
-                _np.sqrt(self.spec11*self.spec22))
+            self._gamma12 = self._spec12 / _prevent_zerodivision(
+                _np.sqrt(self._spec11*self._spec22))
         return self._gamma12
 
     def coherence(self):
@@ -237,7 +192,7 @@ class GCC(object):
         
         """        
         if self._phat is None:
-            spec = self.spec12 / _prevent_zerodivision(_np.abs(self.spec12))
+            spec = self._spec12 / _prevent_zerodivision(_np.abs(self._spec12))
             self._phat = GCC.Estimate(
                 name='PHAT', 
                 sig=self._backtransform(spec), 
@@ -274,7 +229,7 @@ class GCC(object):
             spec_noise22 = _np.real(spec_noise2*spec_noise2.conj())
             weight = spec_sig00 /_prevent_zerodivision(
                 spec_noise11*spec_noise22)
-            spec = self.spec12*weight
+            spec = self._spec12*weight
             self._eckart = GCC.Estimate(
                 name='Eckart', 
                 sig=self._backtransform(spec), 
@@ -285,7 +240,7 @@ class GCC(object):
         """Returns GCC HT estimate"""
         if self._ht is None:
             coh = _np.abs(self.gamma12())**2
-            spec = self.spec12*coh/_prevent_zerodivision(_np.abs(self.spec12)*(1-coh))
+            spec = self._spec12*coh/_prevent_zerodivision(_np.abs(self._spec12)*(1-coh))
             self._ht = GCC.Estimate(
                 name='HT', 
                 sig=self._backtransform(spec), 
@@ -321,8 +276,10 @@ def _get_fftfuncs(*signals):
         return _sc.fft.fft, _sc.fft.ifft
 
 
-def _prevent_zerodivision(sig, reg=1e-12, rep=1e-12):
-    """Replaces values smaler reg. Same for negative values and negative reg.
+def _prevent_zerodivision(sig, eps=1e-12):
+    """
+    Replaces values smaller than reg. Same for negative values
+    and negative reg.
     
     Replaces 
     
@@ -348,8 +305,4 @@ def _prevent_zerodivision(sig, reg=1e-12, rep=1e-12):
         Modified sig usable for division.
 
     """
-    reg = abs(reg)
-    rep = abs(rep)
-    sig[_np.logical_and(sig < reg, sig >= 0)] = rep
-    sig[_np.logical_and(sig > -reg, sig <= 0)] = -rep
-    return sig
+    return sig + eps
