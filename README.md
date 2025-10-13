@@ -74,11 +74,12 @@ noise_both = np.random.randn(256)
 sig1[:256] = noise_both
 sig2[500:756] = noise_both
 
-# create a lags array
-lags = corrlags(2*nsamp-1, samplerate=1)
-
 # Create the a GCC instance    
-gcc = GCC(sig1, sig2)
+gcc = GCC(nsamp, beta=0.0)
+gcc.fit(sig1, sig2)
+
+# create a lags array
+lags = corrlags(gcc._corrlen, samplerate=1)
 
 def mkplot(est, p):
     plt.subplot(p)

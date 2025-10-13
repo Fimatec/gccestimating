@@ -161,16 +161,17 @@ class GCC(object):
                 spec=spec)
         return self._roth
 
-    def scot(self):
-        """Returns GCC SCOT estimate 
+    def scot(self, alpha=0.5):
+        """Returns parameterized GCC SCOT estimate 
         
         Smoothed gamma12 Transformed GCC.
     
-        $\\mathcal{F}^{-1} (S_{xy}/\\sqrt{S_{xx}S_{yy}})$
+        $\\mathcal{F}^{-1} (S_{xy}/{(S_{xx}S_{yy})^\\alpha})$
         
         """        
         if self._scot is None:
-            spec = self.gamma12()
+            spec = self._spec12 / _prevent_zerodivision(
+                (self._spec11*self._spec22)**alpha)
             self._scot = GCC.Estimate(
                 name='SCOT', 
                 sig=self._backtransform(spec), 
@@ -188,16 +189,17 @@ class GCC(object):
         """Returns the coherence."""
         return self.gamma12()**2
 
-    def phat(self):
-        """Returns GCC PHAT estimate 
+    def phat(self, alpha=1.0):
+        """Returns parameterized GCC PHAT estimate 
         
         PHAse Transformed GCC.
         
-        $\\mathcal{F}^{-1}(S_{xy}/|S_{xy}|)$
+        $\\mathcal{F}^{-1}(S_{xy}/|S_{xy}|^\\alpha)$
         
         """        
         if self._phat is None:
-            spec = self._spec12 / _prevent_zerodivision(_np.abs(self._spec12))
+            spec = self._spec12 / _prevent_zerodivision(
+                _np.abs(self._spec12)**alpha)
             self._phat = GCC.Estimate(
                 name='PHAT', 
                 sig=self._backtransform(spec), 
