@@ -1,9 +1,5 @@
 # Generalized Cross Correlation (GCC) Estimates
 
-[![CodeFactor](https://www.codefactor.io/repository/github/siggigue/gccestimating/badge)](https://www.codefactor.io/repository/github/siggigue/gccestimating)
-[![Coverage Status](https://coveralls.io/repos/github/SiggiGue/gccestimating/badge.svg)](https://coveralls.io/github/SiggiGue/gccestimating)
-[![Documentation Status](https://readthedocs.org/projects/gccestimating/badge/?version=latest)](https://gccestimating.readthedocs.io/en/latest/?badge=latest)
-
 This project provides estimators for the generalized cross correlation according to *Knapp and Carter 1976* [KC76].
 
 
@@ -12,46 +8,42 @@ This project provides estimators for the generalized cross correlation according
 The generalized Estimator can be described by
 
 
-<img src="https://render.githubusercontent.com/render/math?math=\hat{R}_{xy}^{(\text{g})} = \int_{-\infty}^{\infty}{\psi_\text{g}(f) G_{xy}(f)~e^{\text{j} 2\pi f \tau} df}">
+$$\hat{R}_{xy}^{(\text{g})}(\tau) = \int_{-\infty}^{\infty}{\psi_\text{g}(f) G_{xy}(f)~e^{\text{i} 2\pi f \tau} df}$$
 
-where <img src="https://render.githubusercontent.com/render/math?math=G_{xy}(f)"> denotes the cross power spectrum of <img src="https://render.githubusercontent.com/render/math?math=x(t)"> and <img src="https://render.githubusercontent.com/render/math?math=y(t)">.
-In this project, all estimates are computed in the spectral domain using the *Wiener-Kinchin relations* (e.g. <img src="https://render.githubusercontent.com/render/math?math=G_{xx}=X(f)X^{*}(f)">).
+where $G_{xy}(f)$ denotes the cross power spectrum of $x(t)$ and $y(t)$.
+In this project, all estimates are computed in the spectral domain using the *Wiener-Kinchin relations* (e.g. $G_{xx}(f)=X(f)X^{*}(f)$).
 
 Following estimators are implemented:
 
 - **Cross Correlation** 
-  <img src="https://render.githubusercontent.com/render/math?math=\psi_{\text{CC}}=1">
-  
+  $$\psi_{\text{CC}}=1$$
 
-- **Roth**; same as the <img src="https://render.githubusercontent.com/render/math?math=`H_1`"> estimator describing the Wiener-Hopf filter
-  <img src="https://render.githubusercontent.com/render/math?math=\psi_{\text{Roth}} = \frac{1}{G_{xx}(f)}">
+- **Roth**: same as the $\text{H}_1$ estimator describing the Wiener-Hopf filter
+  $$\psi_{\text{Roth}} = \frac{1}{G_{xx}(f)}$$
 
-- **Smoothed Coherence Transform** (SCOT): 
-  <img src="https://render.githubusercontent.com/render/math?math=\psi_{\text{SCOT}} = \frac{1}{\sqrt{G_{xx}(f)G_{yy}(f)}}">
+- **Parameterized Smoothed Coherence Transform** (SCOT): 
+  $$\psi_{\text{SCOT}} = \frac{1}{(G_{xx}(f)G_{yy}(f))^\alpha}$$
+  - Original SCOT: $\alpha = 0.5$
+  - Improved SCOT: $\alpha = 0.75$
 
-- **PHAse Transform** (PHAT): 
-  <img src="https://render.githubusercontent.com/render/math?math=\psi_{\text{PHAT}} = \frac{1}{|G_{xy}(f)|}">
+- **Parameterized PHAse Transform** (PHAT): 
+  $$\psi_{\text{PHAT}} = \frac{1}{|G_{xy}(f)|^\alpha}$$
+  - Original PHAT: $\alpha = 1$
+  - Improved PHAT: $\alpha\in[0.5, 0.7]$
 
-- Eckart
-  <img src="https://render.githubusercontent.com/render/math?math=\psi_{\text{Eckart}} = \frac{G_{uu}(f)}{G_{nn}(f)G_{mm}(f)}">
+- **Eckart**
+  $$\psi_{\text{Eckart}} = \frac{G_{uu}(f)}{G_{nn}(f)G_{mm}(f)}$$
 
-- **Hanan Thomson** (HT), Maximum Likelihood  estimator 
-  <img src="https://render.githubusercontent.com/render/math?math=\psi_{\text{HT}} = \psi_{\text{ML}} = \frac{\left|\gamma_{xy}(f)\right|^2}{\left|G_{xy}\right| \left(1-\gamma_{xy}(f)\right)^2}">
+- **Hanan Thomson** (HT), also known as **Maximum Likelihood** (ML) estimator 
+  $$\psi_{\text{HT}} = \psi_{\text{ML}} = \frac{\left|\gamma_{xy}(f)\right|^2}{\left|G_{xy}\right| \left(1-\gamma_{xy}(f)\right)^2}$$
   with 
-  <img src="https://render.githubusercontent.com/render/math?math=\gamma_{xy}(f) = \frac{G_{xy}(f)}{\sqrt{G_{xx}(f)G_{yy}(f)}}">
+  $$\gamma_{xy}(f) = \frac{G_{xy}(f)}{\sqrt{G_{xx}(f)G_{yy}(f)}}$$
 
 ## Insalling
 
-This repo uses a `pyproject.toml` file generated with the dependency and package managing tool *poetry*.
-
-This package can be installed with an up to date pip
 `pip install .`
 
-or using poetry
-`poetry install`
-
 otherwise use your own favorite way to install/use the code in your environment.
-
 
 ## Example
 
@@ -74,7 +66,7 @@ noise_both = np.random.randn(256)
 sig1[:256] = noise_both
 sig2[500:756] = noise_both
 
-# Create the a GCC instance    
+# Create the a GCC instance, without averaging
 gcc = GCC(nsamp, beta=0.0)
 gcc.fit(sig1, sig2)
 
