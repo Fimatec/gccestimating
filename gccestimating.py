@@ -2,7 +2,7 @@
 
 Istanciation Signatures:
 
-- `gcc = GCC(sig1, sig2, fftlen)`
+- `gcc = GCC(fftlen)`
 
 Estimators:
 
@@ -26,8 +26,10 @@ class GCC(object):
     ----------
     sig_len: int
         Length of the both input signals
+    dtype: str
+        data type in str, compatible with np.dtype(dtype_str)
     fftlen : int or None
-        Length of fft to be computed. 
+        Length of fft to be computed, must be greater than 2*sig_len.
         If None, it will be calculated automatically as next power of two.
     beta : float (default=0.9)
         EMA Smoothing factor for spectra
@@ -38,19 +40,15 @@ class GCC(object):
 
     """
 
-    def __init__(self, sig_len, fftlen=None, window='boxcar', beta=0.9):
-        corrlen = 2 * sig_len - 1
-        fftlen = fftlen or int(2**_np.ceil(_np.log2(corrlen)))
-        self._corrlen = corrlen
-        self._fftlen = fftlen
+    def __init__(self, sig_len, dtype='complex64', fftlen=None,
+                 window='boxcar', beta=0.9):
+        self._fft, self._ifft = _get_fftfuncs(dtype)
+        self._corrlen = 2 * sig_len - 1
+        self._fftlen = fftlen or int(2**_np.ceil(_np.log2(self._corrlen)))
         self._window = window
         self._beta = beta
         self._spec1 = None
         self._spec2 = None   
-        self._sig1 = None
-        self._sig2 = None   
-        self._fft = None  
-        self._ifft = None
         self._spec11 = 0
         self._spec22 = 0
         self._spec12 = 0
@@ -62,12 +60,7 @@ class GCC(object):
         self._eckart = None
         self._ht = None
 
-    def fit(self, sig1, sig2) -> 'GCC':
-        fft, ifft = _get_fftfuncs(sig1, sig2)
-        spec1 = fft(sig1, self._fftlen)
-        spec2 = fft(sig2, self._fftlen)
-        self._sig1 = sig1
-        self._sig2 = sig2   
+    def fit_from_spectra(self, spec1, spec2):
         self._spec1 = spec1
         self._spec2 = spec2   
         if self._spec11 is None:
@@ -81,9 +74,7 @@ class GCC(object):
                 (1 - self._beta) * _np.real(self._spec2 * _np.conj(self._spec2))
             self._spec12 = self._beta * self._spec12 + \
                 (1 - self._beta) * (self._spec1 * _np.conj(self._spec2))
-        self._fft = fft  
-        self._ifft = ifft
-        self._gamma12 = None
+        self._gamma12 = self.gamma12()
         self._cc = None
         self._roth = None
         self._scot = None
@@ -92,6 +83,13 @@ class GCC(object):
         self._ht = None
         return self
 
+    def fit(self, sig1, sig2):
+        spec1, spec2 = map(self.fft, (sig1, sig2))
+        return self.fit_from_spectra(spec1, spec2)
+
+    def fft(self, sig):
+        return self._fft(sig, self._fftlen)
+        
     def _backtransform(self, spec):
         window = _sc.signal.get_window(self._window, len(spec))
         sig = self._ifft(window * spec, self._fftlen)
@@ -275,12 +273,10 @@ def corrlags(corrlen, samplerate=1):
     return _np.arange(-la*dt, lb*dt, dt)
 
 
-def _get_fftfuncs(*signals):
-    """Returns fft, ifft function depending on given signals data type."""
-    if _np.all([_np.all(_np.isreal(sig)) for sig in signals]):
-        return _sc.fft.rfft, _sc.fft.irfft
-    else:
-        return _sc.fft.fft, _sc.fft.ifft
+def _get_fftfuncs(dtype):
+    """Returns fft, ifft function depending on given dtype (str)."""
+    if "complex" in dtype: return _sc.fft.fft, _sc.fft.ifft 
+    else: return _sc.fft.rfft, _sc.fft.irfft
 
 
 def _prevent_zerodivision(sig, reg=1e-12, rep=1e-12):
