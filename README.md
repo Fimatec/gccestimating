@@ -11,11 +11,12 @@ The generalized Estimator can be described by
 $$\hat{R}_{xy}^{(\text{g})}(\tau) = \int_{-\infty}^{\infty}{\psi_\text{g}(f) G_{xy}(f)~e^{\text{i} 2\pi f \tau} df}$$
 
 where $G_{xy}(f)$ denotes the cross power spectrum of $x(t)$ and $y(t)$.
-In this project, all estimates are computed in the spectral domain using the *Wiener-Kinchin relations* (e.g. $G_{xx}(f)=X(f)X^{*}(f)$).
+In this project, all estimates are computed in the spectral domain using the *Wiener-Kinchin relations*, e.g.
+$$G_{xx}(f)=X(f)X^{*}(f)$$.
 
 Following estimators are implemented:
 
-- **Cross Correlation** 
+- **Cross Correlation**:
   $$\psi_{\text{CC}}=1$$
 
 - **Roth**: same as the $\text{H}_1$ estimator describing the Wiener-Hopf filter
@@ -31,10 +32,10 @@ Following estimators are implemented:
   - Original PHAT: $\alpha = 1$
   - Improved PHAT: $\alpha\in[0.5, 0.7]$
 
-- **Eckart**
+- **Eckart**:
   $$\psi_{\text{Eckart}} = \frac{G_{uu}(f)}{G_{nn}(f)G_{mm}(f)}$$
 
-- **Hanan Thomson** (HT), also known as **Maximum Likelihood** (ML) estimator 
+- **Hanan Thomson** (HT), also known as **Maximum Likelihood** (ML) estimator:
   $$\psi_{\text{HT}} = \psi_{\text{ML}} = \frac{\left|\gamma_{xy}(f)\right|^2}{\left|G_{xy}\right| \left(1-\gamma_{xy}(f)\right)^2}$$
   with 
   $$\gamma_{xy}(f) = \frac{G_{xy}(f)}{\sqrt{G_{xx}(f)G_{yy}(f)}}$$
