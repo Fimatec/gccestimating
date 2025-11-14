@@ -49,9 +49,9 @@ class GCC(object):
         self._beta = beta
         self._spec1 = None
         self._spec2 = None   
-        self._spec11 = 0
-        self._spec22 = 0
-        self._spec12 = 0
+        self._spec11 = None
+        self._spec22 = None
+        self._spec12 = None
         self._gamma12 = None
         self._cc = None
         self._roth = None
@@ -96,6 +96,20 @@ class GCC(object):
         sig = _np.roll(sig, len(sig)//2)
         start = (len(sig)-self._corrlen)//2 + 1
         return sig[start:start+self._corrlen]
+
+    def clear(self):
+        self._spec1 = None
+        self._spec2 = None   
+        self._spec11 = None
+        self._spec22 = None
+        self._spec12 = None
+        self._gamma12 = None
+        self._cc = None
+        self._roth = None
+        self._scot = None
+        self._phat = None
+        self._eckart = None
+        self._ht = None
 
     @_dataclass(init=True, repr=True, eq=True)
     class Estimate():
