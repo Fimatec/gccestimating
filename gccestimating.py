@@ -273,7 +273,7 @@ def corrlags(corrlen, samplerate=1):
     Parameters
     ----------
     corrlen : int
-        Lenght of correlation function (usually 2N-1).
+        Lenght of correlation function (expects 2N-1).
     samplerate : scalar
     
     Returns
@@ -283,8 +283,7 @@ def corrlags(corrlen, samplerate=1):
     """
     dt = 1 / samplerate
     la = corrlen // 2
-    lb = la+1 if corrlen%2 else la
-    return _np.arange(-la*dt, lb*dt, dt)
+    return _np.linspace(-la*dt, la*dt, corrlen)
 
 
 def _get_fftfuncs(dtype):
