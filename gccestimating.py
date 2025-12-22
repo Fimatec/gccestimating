@@ -26,11 +26,10 @@ class GCC(object):
     ----------
     sig_len: int
         Length of the both input signals
+    upsample: int
+        Whittaker–Shannon interpolation density (default=1)
     dtype: str
-        data type in str, compatible with np.dtype(dtype_str)
-    fftlen : int or None
-        Length of fft to be computed, must be greater than 2*sig_len.
-        If None, it will be calculated automatically as next power of two.
+        Data type in str, compatible with np.dtype(dtype_str)
     beta : float (default=0.9)
         EMA Smoothing factor for spectra
 
@@ -40,12 +39,13 @@ class GCC(object):
 
     """
 
-    def __init__(self, sig_len, dtype='complex64', fftlen=None,
-                 window='boxcar', beta=0.9):
+    def __init__(self, sig_len, upsample=1, dtype='complex64', beta=0.9):
         self._fft, self._ifft = _get_fftfuncs(dtype)
-        self._corrlen = 2 * sig_len - 1
-        self._fftlen = fftlen or int(2**_np.ceil(_np.log2(self._corrlen)))
-        self._window = window
+        self._upsample = upsample
+        self._sig_len = sig_len
+        self._corr_len = 2 * sig_len - 1
+        self._out_len = 2 * sig_len * upsample - 1
+        self._pad = self._out_len - self._corr_len
         self._beta = beta
         self._spec1 = None
         self._spec2 = None   
@@ -88,14 +88,17 @@ class GCC(object):
         return self.fit_from_spectra(spec1, spec2)
 
     def fft(self, sig):
-        return self._fft(sig, self._fftlen)
+        return self._fft(sig, self._corr_len)
         
     def _backtransform(self, spec):
-        window = _sc.signal.get_window(self._window, len(spec))
-        sig = self._ifft(window * spec, self._fftlen)
-        sig = _np.roll(sig, len(sig)//2)
-        start = (len(sig)-self._corrlen)//2 + 1
-        return sig[start:start+self._corrlen]
+        spec = _np.r_[
+            spec[:self._corr_len//2+1],
+            _np.zeros(self._pad, dtype=complex),
+            spec[self._corr_len//2+1:]
+        ] * self._upsample
+        sig = self._ifft(spec)
+        sig = _sc.fft.fftshift(sig)
+        return sig
 
     def clear(self):
         self._spec1 = None
@@ -139,11 +142,6 @@ class GCC(object):
         def __len__(self):
             return len(self.sig)
 
-        def index_to_lag(self, index, samplerate=None):
-            lag = (index - len(self.sig)//2) 
-            if samplerate:
-                lag /= samplerate
-            return lag
 
     def cc(self):
         """Returns GCC estimate 
@@ -267,23 +265,26 @@ class GCC(object):
         return self._ht
 
 
-def corrlags(corrlen, samplerate=1):
+def corrlags(n, samplerate=1, upsample=1):
     """Returns array of lags.
     
     Parameters
     ----------
-    corrlen : int
-        Lenght of correlation function (expects 2N-1).
+    n: int
+        Length of the signal
     samplerate : scalar
+        Samplerate of the signal
+    upsample: int
+        Interpolation density (default=1)
     
     Returns
     -------
     lags : ndarray
     
     """
-    dt = 1 / samplerate
-    la = corrlen // 2
-    return _np.linspace(-la*dt, la*dt, corrlen)
+    dt = 1 / (samplerate * upsample)
+    m = n * upsample
+    return _np.arange(-m+1, m) * dt
 
 
 def _get_fftfuncs(dtype):
